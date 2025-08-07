@@ -1,0 +1,4 @@
+<?jelly escape-by-default='true'?>
+<f:entry title="Prompt" field="prompt">
+  <f:textbox />
+</f:entry>
