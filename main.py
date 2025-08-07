@@ -4,10 +4,14 @@ from typing import List, Dict, Any
 from jinja2 import Environment, FileSystemLoader
 from uuid import uuid4
 from datetime import datetime
+from pathlib import Path
+import subprocess
+
 
 app = FastAPI(title="Jenkins Pipeline Generator")
 
-env = Environment(loader=FileSystemLoader("templates"))
+template_dir = Path(__file__).parent / "templates"
+env = Environment(loader=FileSystemLoader(str(template_dir)))
 template = env.get_template("Jenkinsfile.j2")
 
 pipelines: Dict[str, Dict[str, Any]] = {}
@@ -36,17 +40,54 @@ def detect_tech_stack(requirements: str) -> List[str]:
     return detected
 
 
-def validate_jenkinsfile(jenkinsfile: str) -> bool:
-    # Stub for syntax validation
-    return True
+def validate_jenkinsfile(jenkinsfile: str) -> tuple[bool, str]:
+    """Validate Jenkinsfile syntax using jenkins-cli or a Groovy parser.
+
+    Attempts to validate the provided Jenkinsfile by first invoking
+    ``jenkins-cli declarative-linter``. If the CLI is unavailable, it falls
+    back to calling a local ``groovy`` executable. Syntax errors from either
+    tool are captured and returned to the caller.
+
+    Returns
+    -------
+    tuple[bool, str]
+        A tuple where the boolean indicates whether the Jenkinsfile is valid
+        and the string contains any error message produced by the validator.
+    """
+
+    cmds = [
+        ("jenkins-cli", ["jenkins-cli", "declarative-linter"], True),
+        ("groovy", ["groovy", "-"], False),
+    ]
+
+    for name, cmd, use_stdin in cmds:
+        try:
+            subprocess.run(
+                cmd,
+                input=jenkinsfile if use_stdin else None,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return True, ""
+        except FileNotFoundError:
+            continue  # Tool not installed; try next option
+        except subprocess.CalledProcessError as e:
+            error_msg = (e.stderr or e.stdout).strip()
+            return False, error_msg
+
+    raise HTTPException(
+        status_code=500, detail="No Jenkinsfile validator available"
+    )
 
 
 @app.post("/generate")
 def generate_pipeline(req: GenerateRequest):
     tech_stack = list({*req.tech_stack, *detect_tech_stack(req.requirements)})
     jenkinsfile = template.render(name=req.name, tech_stack=tech_stack)
-    if not validate_jenkinsfile(jenkinsfile):
-        raise HTTPException(status_code=400, detail="Invalid Jenkinsfile syntax")
+    is_valid, error_msg = validate_jenkinsfile(jenkinsfile)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
 
     pipeline_id = str(uuid4())
     pipelines[pipeline_id] = {
