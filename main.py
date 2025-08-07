@@ -4,10 +4,12 @@ from typing import List, Dict, Any
 from jinja2 import Environment, FileSystemLoader
 from uuid import uuid4
 from datetime import datetime
+from pathlib import Path
 
 app = FastAPI(title="Jenkins Pipeline Generator")
 
-env = Environment(loader=FileSystemLoader("templates"))
+template_dir = Path(__file__).parent / "templates"
+env = Environment(loader=FileSystemLoader(str(template_dir)))
 template = env.get_template("Jenkinsfile.j2")
 
 pipelines: Dict[str, Dict[str, Any]] = {}
