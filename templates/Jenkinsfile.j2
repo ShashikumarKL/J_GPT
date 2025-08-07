@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building...'
+            }
+        }
+        {% if 'docker' in tech_stack %}
+        stage('Docker Build') {
+            steps {
+                echo 'Building Docker image'
+            }
+        }
+        {% endif %}
+          {% if 'artifactory' in tech_stack %}
+          stage('Publish to Artifactory') {
+              steps {
+                  echo 'Publishing to Artifactory'
+              }
+          }
+          {% endif %}
+          {% if 'cmake' in tech_stack %}
+          stage('CMake Build') {
+              steps {
+                  sh 'cmake . && make'
+              }
+          }
+          {% endif %}
+          {% if 'make' in tech_stack %}
+          stage('Make Build') {
+              steps {
+                  sh 'make'
+              }
+          }
+          {% endif %}
+          {% if 'ghs' in tech_stack %}
+          stage('GHS Build') {
+              steps {
+                  sh 'ghs build'
+              }
+          }
+          {% endif %}
+          {% if 'bat' in tech_stack %}
+          stage('Execute BAT Script') {
+              steps {
+                  bat 'build.bat'
+              }
+          }
+          {% endif %}
+          {% if 'sh' in tech_stack %}
+          stage('Execute SH Script') {
+              steps {
+                  sh './build.sh'
+              }
+          }
+          {% endif %}
+      }
+  }
